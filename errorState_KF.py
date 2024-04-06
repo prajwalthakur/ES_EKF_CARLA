@@ -61,6 +61,8 @@ class es_ekf:
         self.p_cov[3:6, 3:6] = np.eye(3) * vel_var
         self.p_cov[6:, 6:] = np.eye(3) * orien_var
         
+        self.initialized = True
+        
     def get_location(self):
         """Return the estimated vehicle location
 

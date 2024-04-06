@@ -1,4 +1,5 @@
-#car class contains the current vehcile states and sensor information
+#car class defines the car member and member function
+# contains the current vehcile states and sensor information
 #sensor information : GNSS , IMU
 # Credit:
 #Shing-Yan Loo (yan99033@gmail.com)

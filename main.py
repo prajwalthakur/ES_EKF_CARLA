@@ -54,6 +54,7 @@ def main():
             world.tick()
             frame = world.get_snapshot().frame
             sensors = car.get_sensor_readings(frame)
+            
             #get ground truth value of vehicle to compare ES-EKF estimate and Ground truth Estimate
             gt_location = car.get_location()
             world_msg['gt_traj'] =  [gt_location.x,gt_location.y,gt_location.z]
@@ -68,16 +69,34 @@ def main():
                 #     gnss = sensors['gnss']
                 #     es_ekf.initialize_with_gnss(gnss)
             
+            
             # EKF Predicition -- imu is running at 200Hz much faster than GNSS update 
             #get imu reading
+            if sensors['imu'] is not None:      
+                es_ekf.predict_state_with_imu(imu)
+            
+            
+            # ES_EKF correction with the gnss/gps reading                   
+            # Get gps reading @ 5Hz
+            if sensors['gnss'] is not None :
+                es_ekf.state_correction_with_gnss(gnss)
+
+            # Limit the visualization frame-rate
+            if time.time() - last_ts < 1. / visual_fps:
+                continue
+            
+            # timestamp for inserting a new item into the queue
+            last_ts = time.time()
+
+
+
+
             if sensors['imu'] is not None:
                 imu = sensors['imu']
                 accel = imu.accelerometer
                 gyro = imu.gyroscope
                 world_msg['imu'] = [accel.x,accel.y,accel.z,
                                      gyro.x, gyro.y, gyro.z]
-                
-                es_ekf.predict_state_with_imu(imu)
             
             
             # ES_EKF correction with the gnss/gps reading                   
@@ -85,7 +104,10 @@ def main():
             if sensors['gnss'] is not None :
                 gnss = sensors['gnss']
                 world_msg['gnss'] = [gnss.x,gnss.y,gnss.z]
-                es_ekf.correct_state_with_gnss(gnss)
+
+
+
+
             
             # Get estimated location
             world_msg['est_traj'] = es_ekf.get_location()
