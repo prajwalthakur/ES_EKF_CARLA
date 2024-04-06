@@ -2,8 +2,9 @@
 import numpy as np
 from matplotlib.pyplot import axis
 from rotations import Quaternion,omega,skew_symmetric,angle_normalize
+import pdb
 
-class es_ekf:
+class error_state_ekf:
     def __init__(self):
         # state of the system (delta-xk = delta-position,delta-velocity and delta-orientation) (3+3+4) #4 quaternion
         # delta-xk = F_{k-1}delta-x_{k-1} + L_{k-1}n_{k-1}
@@ -26,7 +27,7 @@ class es_ekf:
         
         #gnss noise variance
         self.var_gnss = 0.01
-        
+        self._gnss_noise_var()
         # Motion model noise Jacobian
         #imu measure 3 linear-acceleration and 3 angular acceleration
         #L_{K} jacobain ( state wrt to imu-measurement ) = 9x6
@@ -49,14 +50,14 @@ class es_ekf:
         return self.initialized
     
     def initialize_with_true_state(self,gt_location):
-        self.p[:,0] = np.array([gt_location.x,gt_location.y,gt_location.z]).reshape((3,1))
+        self.p[:,0] = np.array([gt_location.x,gt_location.y,gt_location.z])
         self.q[:, 0] = Quaternion().to_numpy()       # w=1., x=0., y=0., z=0. 
         
         # estimate on p-covariance :
         #low uncertainty in position estimation and high in orientation and velocity
         pos_var = 0.01
-        orien_var = 10
-        vel_var = 10
+        orien_var = 5
+        vel_var = 5
         self.p_cov[:3, :3] = np.eye(3) * pos_var
         self.p_cov[3:6, 3:6] = np.eye(3) * vel_var
         self.p_cov[6:, 6:] = np.eye(3) * orien_var
@@ -97,7 +98,8 @@ class es_ekf:
         # Update Covariance
         F = self._calulcate_motion_model_jacobian(R,imu_f,delta_t) #Jacobian of the motion (state-space model) model
         Q = self._imu_noise_var(delta_t)
-        R = self._gnss_noise_var()
+        #self.R = self._gnss_noise_var(delta_t)
+        #pdb.set_trace()
         self.p_cov = F@self.p_cov@F.T + self.L_jac@Q@self.L_jac.T
         
         
@@ -106,7 +108,7 @@ class es_ekf:
         """Calculate the derivative of motion model function with respect to the 
         corrected predictid previous state , previous conrol , 0 process-noise
         states : x,y,z,w,x,y,z,vx,vy,vz"""
-        F = np.eye(9)
+        F = np.zeros((9,9))
         
         F[:3,:3] = np.eye(3)                           #jacobain of the x,y,z wrt to the x,y,z (grad of eqn-1 wrt to x)
         F[:3,3:6] = np.eye(3)*delta_t                  #jacobian of the x,y,z wrt to vx,vy,vz (grad of eqn-1 wrt to v)
@@ -122,44 +124,44 @@ class es_ekf:
         # grad of ( wx,wy,wz ) i.e grad of eqn-3 wrt ...
         F[6:9,:3]  = np.zeros(3)  #wrt to (x,y,z)
         F[6:9,3:6] = np.zeros(3)  #wrt to (vx,vy,vz)
-        F[6:9,6:9] =  np.ones(3)  #wrt to (qx,qy,qz)
-    
+        F[6:9,6:9] =  np.eye(3)  #wrt to (qx,qy,qz)
+        
+        # pdb.set_trace()
+        
+        # Vc = np.eye(9)
+        # Vc[:3, 3:6] = np.eye(3) * delta_t
+        # Vc[3:6, 6:] = -skew_symmetric(R @ imu_f) * delta_t  
+        return F
     
     def _imu_noise_var(self,delta_t):
         #IMU measurement model : IMU sensor output  w(t) = 
-        """Calculate the IMU noise according to the pre-defined sensor profile"""
-        
+        """Calculate the IMU noise according to the pre-defined sensor profile"""        
         Q = delta_t*delta_t*np.diag(np.hstack((np.ones(3,)*self.var_imu_acc,np.ones(3,)*self.var_imu_gyro)))
-        
         return Q
     
     
-    def _gnss_noise_var(self,delta_t):
+    def _gnss_noise_var(self):
         #GNSS measurement model : IMU sensor output  w(t) = 
         """Calculate the GNSS noise according to the pre-defined sensor profile"""
         
-        R = np.diag(np.ones(3,)*self.var_gnss)
-        
-        return R
+        self.measurement_var = np.diag(np.ones(3,)*self.var_gnss)
     
-    def state_correction_with_gnss(self,gnss,R):
+    def state_correction_with_gnss(self,gnss):
         #y_k = h(x_k) + vk
         # d_{yk} = H_kd_{xk} + M_kv_k = [1 0 0]d_{xk} + vk
-        
         x = gnss.x
         y = gnss.y
         z = gnss.z
         
         #kalman gain
-        K = self.p_cov@self.H_jac.T@( np.linalg.inv(self.H_jac@self.p_cov@self.H_jac.T + R) )
+        K = self.p_cov@self.H_jac.T@( np.linalg.inv(self.H_jac@self.p_cov@self.H_jac.T + self.measurement_var) )
         
         # compute the error state (ES-EKF)
         delta_x = K@(np.array([x, y, z])[:, None] - self.p)
         
         #state-correction
-        
         self.p = self.p + delta_x[:3]
-        self.v = self.v + delta_x[3:]
+        self.v = self.v + delta_x[3:6]
         delta_q = Quaternion(axis_angle=angle_normalize(delta_x[6:]))
         self.q = delta_q.quat_mult_left(self.q)
         

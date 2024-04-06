@@ -49,23 +49,24 @@ class Car:
         
         
         # Sensor noise profile 
-        NOISE_STDDEV = 0.1
+        IMU_NOISE_STDDEV = 0.01
+        GNSS_NOISE_STDDEV  = 1e-5
         NOISE_BIAS = 1e-5
-        NOISE_IMU_ACC_X_STDDEV = NOISE_STDDEV
-        NOISE_IMU_ACC_Y_STDDEV = NOISE_STDDEV
-        NOISE_IMU_ACC_Z_STDDEV = NOISE_STDDEV
+        NOISE_IMU_ACC_X_STDDEV = IMU_NOISE_STDDEV
+        NOISE_IMU_ACC_Y_STDDEV = IMU_NOISE_STDDEV
+        NOISE_IMU_ACC_Z_STDDEV = IMU_NOISE_STDDEV
         NOISE_IMU_GYRO_X_BIAS = NOISE_BIAS
-        NOISE_IMU_GYRO_X_STDDEV = NOISE_STDDEV
+        NOISE_IMU_GYRO_X_STDDEV = IMU_NOISE_STDDEV
         NOISE_IMU_GYRO_Y_BIAS = NOISE_BIAS
-        NOISE_IMU_GYRO_Y_STDDEV = NOISE_STDDEV
+        NOISE_IMU_GYRO_Y_STDDEV = IMU_NOISE_STDDEV
         NOISE_IMU_GYRO_Z_BIAS = NOISE_BIAS
-        NOISE_IMU_GYRO_Z_STDDEV = NOISE_STDDEV
+        NOISE_IMU_GYRO_Z_STDDEV =IMU_NOISE_STDDEV
         NOISE_GNSS_ALT_BIAS = NOISE_BIAS
-        NOISE_GNSS_ALT_STDDEV = NOISE_STDDEV
+        NOISE_GNSS_ALT_STDDEV = GNSS_NOISE_STDDEV
         NOISE_GNSS_LAT_BIAS = NOISE_BIAS
-        NOISE_GNSS_LAT_STDDEV = NOISE_STDDEV
+        NOISE_GNSS_LAT_STDDEV = GNSS_NOISE_STDDEV
         NOISE_GNSS_LON_BIAS = NOISE_BIAS
-        NOISE_GNSS_LON_STDDEV = NOISE_STDDEV
+        NOISE_GNSS_LON_STDDEV = GNSS_NOISE_STDDEV
         
         # Initialize the vehicle and the sensors
         bp_lib = world.get_blueprint_library()
@@ -93,13 +94,15 @@ class Car:
 
         # Sensor sampling frequency
         IMU_FREQ = 200 #in Hz
-        GNSS_FREQ = 5  #in Hz
+        GNSS_FREQ = 10  #in Hz
         imu_bp.set_attribute('sensor_tick', str(1.0 / IMU_FREQ))
         gnss_bp.set_attribute('sensor_tick', str(1.0 / GNSS_FREQ))
-
+        camera_bp.set_attribute('sensor_tick', str(1.0 / GNSS_FREQ))
         self.vehicle = world.spawn_actor(vehicle_bp, spawn_point)
         self.vehicle.set_autopilot(True)
-
+        self.spectator = world.get_spectator()
+        #world_snapshot = world.wait_for_tick() 
+        self.spectator.set_transform(self.vehicle.get_transform())
         self.camera = world.spawn_actor(
             blueprint=camera_bp,
             transform=carla.Transform(carla.Location(x=1.6, z=1.6)),
