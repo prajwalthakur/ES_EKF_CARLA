@@ -96,7 +96,8 @@ class es_ekf:
         F = self._calulcate_motion_model_jacobian(R,imu_f,delta_t) #Jacobian of the motion (state-space model) model
         Q = self._imu_noise_var(delta_t)
         R = self._gnss_noise_var()
-        self.p_cov = 0.0 #TODO:
+        self.p_cov = F@self.p_cov@F.T + self.L_jac@Q@self.L_jac.T
+        
         
         
     def _calulcate_motion_model_jacobian(self,R,imu_f,delta_t):
@@ -152,3 +153,14 @@ class es_ekf:
         
         # compute the error state (ES-EKF)
         delta_x = K@(np.array([x, y, z])[:, None] - self.p)
+        
+        #state-correction
+        
+        self.p = self.p + delta_x[:3]
+        self.v = self.v + delta_x[3:]
+        delta_q = Quaternion(axis_angle=angle_normalize(delta_x[6:]))
+        self.q = delta_q.quat_mult_left(self.q)
+        
+        #Correction_covariance
+        self.p_cov = ( np.eye(9) - K@self.H_jac)@self.p_cov
+        
