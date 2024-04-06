@@ -29,14 +29,16 @@ class es_ekf:
         
         # Motion model noise Jacobian
         #imu measure 3 linear-acceleration and 3 angular acceleration
-        #L_{K} jacobain ( x_k wrt to imu-measurement ) = 9x6
+        #L_{K} jacobain ( state wrt to imu-measurement ) = 9x6
         self.L_jac = np.zeros([9, 6])
         
-        self.L_jac[3:, :] = np.eye(6)  # motion model noise jacobian
+        self.L_jac[3:, :] = np.eye(6)  # motion model noise jacobian this is due to the nois in imu
 
-        # Measurement model Jacobian
-        self.h_jac = np.zeros([3, 9])
-        self.h_jac[:, :3] = np.eye(3)
+        # Measurement model Jacobian GNSS
+        # H_{K} jacobian (state wrt to gnss-measurement)
+        # y_k =  [1 0 0]'xk + vk
+        self.H_jac = np.zeros([3, 9])
+        self.H_jac[:, :3] = np.eye(3)
 
         # Initialized
         self.n_gnss_taken = 0
@@ -92,7 +94,8 @@ class es_ekf:
         
         # Update Covariance
         F = self._calulcate_motion_model_jacobian(R,imu_f,delta_t) #Jacobian of the motion (state-space model) model
-        Q = self._imu_noise(delta_t)
+        Q = self._imu_noise_var(delta_t)
+        R = self._gnss_noise_var()
         self.p_cov = 0.0 #TODO:
         
         
@@ -104,13 +107,13 @@ class es_ekf:
         
         F[:3,:3] = np.eye(3)                           #jacobain of the x,y,z wrt to the x,y,z (grad of eqn-1 wrt to x)
         F[:3,3:6] = np.eye(3)*delta_t                  #jacobian of the x,y,z wrt to vx,vy,vz (grad of eqn-1 wrt to v)
-        F[:3,6:9] = 0.0 #TODO:                                   #jacobian of the x,y,z wrt to qx,qy,qz (grad of eqn-1 wrt to R@imu_f) (grad of (x,y,z) wrt to orientation)
+        F[:3,6:9] = np.zeros(3)                       #jacobian of the x,y,z wrt to qx,qy,qz (grad of eqn-1 wrt to R@imu_f) (grad of (x,y,z) wrt to orientation)
         
         
         #grad of speed (vx,vy,vz) i.e ( grad of equaton-2 )  wrt ...
         F[3:6,:3]  =  np.zeros(3)
         F[3:6,3:6] =  np.eye(3)  #wrt to (vx,vy,z=vz)
-        F[3:6,6:9] =  0.0 #TODO:
+        F[3:6,6:9] =  -skew_symmetric(R@imu_f)*delta_t 
 
 
         # grad of ( wx,wy,wz ) i.e grad of eqn-3 wrt ...
@@ -119,10 +122,33 @@ class es_ekf:
         F[6:9,6:9] =  np.ones(3)  #wrt to (qx,qy,qz)
     
     
-    def _imu_noise(self,delta_t):
+    def _imu_noise_var(self,delta_t):
         #IMU measurement model : IMU sensor output  w(t) = 
         """Calculate the IMU noise according to the pre-defined sensor profile"""
         
         Q = delta_t*delta_t*np.diag(np.hstack((np.ones(3,)*self.var_imu_acc,np.ones(3,)*self.var_imu_gyro)))
         
+        return Q
+    
+    
+    def _gnss_noise_var(self,delta_t):
+        #GNSS measurement model : IMU sensor output  w(t) = 
+        """Calculate the GNSS noise according to the pre-defined sensor profile"""
         
+        R = np.diag(np.ones(3,)*self.var_gnss)
+        
+        return R
+    
+    def state_correction_with_gnss(self,gnss,R):
+        #y_k = h(x_k) + vk
+        # d_{yk} = H_kd_{xk} + M_kv_k = [1 0 0]d_{xk} + vk
+        
+        x = gnss.x
+        y = gnss.y
+        z = gnss.z
+        
+        #kalman gain
+        K = self.p_cov@self.H_jac.T@( np.linalg.inv(self.H_jac@self.p_cov@self.H_jac.T + R) )
+        
+        # compute the error state (ES-EKF)
+        delta_x = K@(np.array([x, y, z])[:, None] - self.p)
