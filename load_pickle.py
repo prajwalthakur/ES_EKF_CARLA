@@ -26,6 +26,7 @@ class PickledDataReader:
     def __init__(self, filename):
         with open(filename, "rb") as f:
             self.data = pickle.load(f)
+            self.data = self.data
         self.index = 0  # Initialize index for tracking
 
     def get_next_data(self):
@@ -35,7 +36,16 @@ class PickledDataReader:
             return data_item
         else:
             return None  # Indicate the end of data
-
+    def get_data_at(self,index):
+        assert self.index == index
+        data_item = self.data[index]
+        self.index+=1
+        return data_item
+    def data_at(self,index):
+        assert self.index == index
+        data_item = self.data[index]
+        return data_item        
+        
 if __name__ == '__main__' :
     filename = "imu_sensor_data.pkl"
     imu_pickled = PickledDataReader(filename)

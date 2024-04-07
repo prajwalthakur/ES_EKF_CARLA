@@ -10,9 +10,8 @@ from mpl_toolkits.mplot3d import Axes3D
 
 import time
 import math
-
+import numpy as np
 from numpy.core.shape_base import block
-
 def add_sensor_reading(sensor_list, new_reading, keep_last_n):
     """Add new sensor reading to the list and only keep the last n
     readings
@@ -29,6 +28,8 @@ def add_sensor_reading(sensor_list, new_reading, keep_last_n):
     if len(sensor_list) > keep_last_n:
         # in-place modification
         sensor_list[:] = sensor_list[-keep_last_n:]
+
+
 
 def add_to_traj(traj_x, traj_y, traj_z, x, y, z, max_len, min_dist=0.1):
     """Add new xyz position to the trajectory
@@ -82,8 +83,8 @@ def visualizer(visual_msg_queue, quit):
     pose_plot.title.set_text('Position')
     imu_plot = fig.add_subplot(gs[:2, 2:4], facecolor=(1.0, 1.0, 1.0))
     imu_plot.title.set_text('IMU')
-    gnss_plot = fig.add_subplot(gs[2:, 2:4], projection='3d', facecolor=(1.0, 1.0, 1.0))
-    gnss_plot.title.set_text('GNSS')
+    error_plot = fig.add_subplot(gs[2:, 2:4], facecolor=(1.0, 1.0, 1.0))
+    error_plot.title.set_text('Euclidian-Error')
 
     # Expand the plot when needed
     pose_plot.autoscale()
@@ -108,6 +109,7 @@ def visualizer(visual_msg_queue, quit):
     # Keep past n IMU sensor reading
     keep_last_n = 50
     t = 0
+    t_e = 0
     ts_imu = []
     acc_x_all = []
     acc_y_all = []
@@ -115,7 +117,8 @@ def visualizer(visual_msg_queue, quit):
     gyro_x_all = []
     gyro_y_all = []
     gyro_z_all = []
-
+    ts_error = []
+    error_x_all = []
     # Font size
     fontsize = 14
 
@@ -146,8 +149,8 @@ def visualizer(visual_msg_queue, quit):
             pose_plot.cla()
 
             # Update plot
-            pose_plot.plot(gt_traj_x, gt_traj_y, gt_traj_z, color='green', linestyle='solid', label='GT')
-            pose_plot.plot(est_traj_x, est_traj_y, est_traj_z, color='blue', linestyle='solid', label='est')
+            pose_plot.plot(gt_traj_x, gt_traj_y, gt_traj_z, color='green', linestyle='solid', label='Ground Truth Trajectory')
+            pose_plot.plot(est_traj_x, est_traj_y, est_traj_z, color='blue', linestyle='solid', label='estimate Trajectory')
             pose_plot.legend(fontsize=fontsize)
 
 
@@ -172,27 +175,43 @@ def visualizer(visual_msg_queue, quit):
             # Update IMU reading
             imu_plot.plot(ts_imu, acc_x_all, label='acc_x')
             imu_plot.plot(ts_imu, acc_y_all, label='acc_y')
-            imu_plot.plot(ts_imu, acc_z_all, label='acc_z')
+            imu_plot.plot(ts_imu, acc_z_all, label='acc_z (gravity)')
             imu_plot.plot(ts_imu, gyro_x_all, label='gyro_x')
             imu_plot.plot(ts_imu, gyro_y_all, label='gyro_y')
             imu_plot.plot(ts_imu, gyro_z_all, label='gyro_z')
             imu_plot.legend(fontsize=fontsize)
 
         # Visualize GNSS reading
-        if msg.get('gnss') is not None:
-            gnss = msg['gnss']
-            add_to_traj(gnss_traj_x, gnss_traj_y, gnss_traj_z, gnss[0], gnss[1], gnss[2], max_traj_len)
+        # if msg.get('gnss') is not None:
+        #     gnss = msg['gnss']
+        #     add_to_traj(gnss_traj_x, gnss_traj_y, gnss_traj_z, gnss[0], gnss[1], gnss[2], max_traj_len)
+
+        #     # Clear previous plot
+        #     gnss_plot.cla()
+
+        #     # Update GNSS reading
+        #     gnss_plot.plot(gnss_traj_x, gnss_traj_y, gnss_traj_z, color='black', linestyle='solid', label='GNSS')
+        #     gnss_plot.legend(fontsize=fontsize)
+            # Visualize GNSS reading
+        if msg.get('gt_traj') is not None : #and  msg.get('est_traj'):
+            gt_traj = np.array(msg['gt_traj']).reshape((3,1))
+            est_traj = np.array(msg['est_traj']).reshape((3,1))
+            norm_error= np.linalg.norm((gt_traj-est_traj))
+            add_sensor_reading(error_x_all, norm_error, keep_last_n)
+            ts_error.append(t_e)
+            if len(ts_error) > keep_last_n:
+                ts_error = ts_error[-keep_last_n:]
 
             # Clear previous plot
-            gnss_plot.cla()
+            error_plot.cla()
 
-            # Update GNSS reading
-            gnss_plot.plot(gnss_traj_x, gnss_traj_y, gnss_traj_z, color='black', linestyle='solid', label='GNSS')
-            gnss_plot.legend(fontsize=fontsize)
-        
+            # Update IMU reading
+            error_plot.plot(ts_error, error_x_all, label='norm-error')
+            error_plot.legend(fontsize=fontsize)        
         # flush any pending GUI events, re-painting the screen if needed
         fig.canvas.flush_events()
-        t += 1
+        t +=  1
+        t_e+= 1
 
         if not quit.value:
             fig.canvas.draw_idle()

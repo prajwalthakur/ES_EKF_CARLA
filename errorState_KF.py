@@ -22,11 +22,11 @@ class error_state_ekf:
         self.g = np.array([0.0,0.0,-9.81]).reshape((3,1))
         
         #Sensor noise variances
-        self.var_imu_acc = 0.01
-        self.var_imu_gyro = 0.01
+        self.var_imu_acc = 0.1
+        self.var_imu_gyro = 0.1
         
         #gnss noise variance
-        self.var_gnss = 0.01
+        self.var_gnss = 0.1
         self._gnss_noise_var()
         # Motion model noise Jacobian
         #imu measure 3 linear-acceleration and 3 angular acceleration
@@ -49,8 +49,11 @@ class error_state_ekf:
     def is_initialized(self):
         return self.initialized
     
-    def initialize_with_true_state(self,gt_location):
-        self.p[:,0] = np.array([gt_location.x,gt_location.y,gt_location.z])
+    def initialize_with_true_state(self,gt_location,recorded=False):
+        if recorded==False:
+            self.p[:,0] = np.array([gt_location.x,gt_location.y,gt_location.z])
+        else:
+            self.p[:,0] = np.array([gt_location['gt_location']['x'],gt_location['gt_location']['y'],gt_location['gt_location']['z']])
         self.q[:, 0] = Quaternion().to_numpy()       # w=1., x=0., y=0., z=0. 
         
         # estimate on p-covariance :
@@ -72,16 +75,25 @@ class error_state_ekf:
         """
         return self.p.reshape(-1).tolist()
     
-    def predict_state_with_imu(self,imu):
+    def predict_state_with_imu(self,imu,recorded = False):
         # imu output is a (noisy-input) to the error-state-space model with process noise :-|--|>
         
-        # IMU acceleration and velocity
-        imu_f = np.array([imu.accelerometer.x, imu.accelerometer.y, imu.accelerometer.z]).reshape(3, 1)
-        imu_w = np.array([imu.gyroscope.x, imu.gyroscope.y, imu.gyroscope.z]).reshape(3, 1)
-        
-        # IMU sampling time
-        delta_t = imu.timestamp - self.last_imu_Ts
-        self.last_imu_Ts  = imu.timestamp
+        if recorded==False:
+            # IMU acceleration and velocity
+            imu_f = np.array([imu.accelerometer.x, imu.accelerometer.y, imu.accelerometer.z]).reshape(3, 1)
+            imu_w = np.array([imu.gyroscope.x, imu.gyroscope.y, imu.gyroscope.z]).reshape(3, 1)
+            
+            # IMU sampling time
+            delta_t = imu.timestamp - self.last_imu_Ts
+            self.last_imu_Ts  = imu.timestamp
+        else :
+            # IMU acceleration and velocity
+            imu_f = np.array([imu['accelerometer']['x'], imu['accelerometer']['y'], imu['accelerometer']['z']]).reshape(3, 1)
+            imu_w = np.array([imu['gyroscope']['x'], imu['gyroscope']['y'], imu['gyroscope']['z']]).reshape(3, 1)            
+            # IMU sampling time
+            delta_t = imu['timestamp'] - self.last_imu_Ts
+            self.last_imu_Ts  = imu['timestamp']
+            
         
         
         R = Quaternion(*self.q).to_mat()
@@ -146,12 +158,17 @@ class error_state_ekf:
         
         self.measurement_var = np.diag(np.ones(3,)*self.var_gnss)
     
-    def state_correction_with_gnss(self,gnss):
+    def state_correction_with_gnss(self,gnss,recorded=False):
         #y_k = h(x_k) + vk
         # d_{yk} = H_kd_{xk} + M_kv_k = [1 0 0]d_{xk} + vk
-        x = gnss.x
-        y = gnss.y
-        z = gnss.z
+        if recorded==True:
+            x = gnss['gnss']['x'] #,gnss['gnss']['y'],gnss['gnss']['z']
+            y = gnss['gnss']['y']
+            z = gnss['gnss']['z']
+        else:
+            x = gnss.x
+            y = gnss.y
+            z = gnss.z
         
         #kalman gain
         K = self.p_cov@self.H_jac.T@( np.linalg.inv(self.H_jac@self.p_cov@self.H_jac.T + self.measurement_var) )

@@ -1,8 +1,6 @@
 import glob
 import os
 import sys
-import pdb
-
 try:
     sys.path.append(glob.glob('../carla/dist/carla-*%d.%d-%s.egg' % (
         sys.version_info.major,
@@ -26,9 +24,9 @@ from errorState_KF import error_state_ekf
 import logging
 import argparse
 import pickle
-import copy
 from pickle_class import imu_pickle,gnss_pickle,gt_pickle
 def main(args):
+    if_save_data = False
     gt_trajc = []
     imu_sensor_data = []
     gnss_sensor_data = []
@@ -84,9 +82,10 @@ def main(args):
                 imu = sensors['imu'] 
                 es_ekf.predict_state_with_imu(imu)
                 gt_loc_copy = gt_pickle(gt_location)
-                gt_trajc.append(gt_loc_copy)
                 imu_copy = imu_pickle(imu)
-                imu_sensor_data.append(imu_copy)
+                if if_save_data:
+                    gt_trajc.append(gt_loc_copy)
+                    imu_sensor_data.append(imu_copy)
             
             
             # ES_EKF correction with the gnss/gps reading                   
@@ -96,7 +95,8 @@ def main(args):
                 es_ekf.state_correction_with_gnss(gnss)
                 timestamp  = sensors['imu'].timestamp
                 gnss_copy = gnss_pickle(gnss,timestamp)
-                gnss_sensor_data.append(gnss_copy)
+                if if_save_data:
+                    gnss_sensor_data.append(gnss_copy)
 
             # Limit the visualization frame-rate
             if time.time() - last_ts < 1. / visual_fps:
@@ -128,10 +128,11 @@ def main(args):
             world_msg_queue.put(world_msg) # enqueue the current msg
             print("gt_location=",gt_location,"---","est_location=",world_msg['est_traj'])
     except KeyboardInterrupt :
-        pickle.dump(imu_sensor_data, open('imu_sensor_data.pkl','wb'))
-        pickle.dump(gt_trajc, open('gt_trajectory.pkl','wb'))
-        pickle.dump(gnss_sensor_data, open('gnss_sensor_data.pkl','wb'))
-        print('Existing Visualizer')
+        if if_save_data:
+            pickle.dump(imu_sensor_data, open('pkl_data/imu_sensor_data.pkl','wb'))
+            pickle.dump(gt_trajc, open('pkl_data/gt_trajectory.pkl','wb'))
+            pickle.dump(gnss_sensor_data, open('pkl_data/gnss_sensor_data.pkl','wb'))
+        print('Exiting Visualizer')
         quit.value = True
         destroy_queue(world_msg_queue)
         print('destroying the car object')
