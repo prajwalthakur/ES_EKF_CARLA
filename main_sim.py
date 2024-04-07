@@ -25,6 +25,29 @@ import logging
 import argparse
 import pickle
 from pickle_class import imu_pickle,gnss_pickle,gt_pickle
+import math
+#utility function
+def calculate_sides(hypotenuse,angle):
+    
+    
+    angle_radians = math.radians(angle)
+    opp_side = hypotenuse*math.sin(angle_radians)
+    adj_side = hypotenuse*math.cos(angle_radians)
+    return opp_side ,adj_side
+
+def get_spectator_pos(vehicle):
+    # subtract the delta x and y to be behind
+    meter_distance = 10
+    vehicle_transform = vehicle.get_transform()
+    y,x = calculate_sides(meter_distance,vehicle_transform.rotation.yaw)
+    spectator_pos = carla.Transform(vehicle_transform.location + carla.Location(x=-x,y=-y,z=10)
+                                    , carla.Rotation(yaw= vehicle_transform.rotation.yaw,pitch=-25))
+    # loc = carla.Location(x=vehicle_transform.location.x,y=vehicle_transform.location.y,z=30)
+    # spectator_pos = carla.Transform(loc
+    #                                 , carla.Rotation(yaw= 180.0,pitch=-90.0))
+    return spectator_pos
+
+
 def main(args):
     if_save_data = False
     gt_trajc = []
@@ -35,14 +58,16 @@ def main(args):
         #client = carla.Client('loacalhost',2000)
         client.set_timeout(10.0)
         world = client.get_world()
-        #settings = world.get_settings()
-        #settings.synchronous_mode = True
-        #settings.fixed_delta_seconds = 0.05
-        #world.apply_settings(settings)
+        # settings = world.get_settings()
+        # settings.synchronous_mode = True
+        # settings.fixed_delta_seconds = 0.05
+        # world.apply_settings(settings)
         spawn_point  = random.choice(world.get_map().get_spawn_points())
         
         #Create a car object
         car = Car(world,client,spawn_point)
+        spectator = world.get_spectator()
+        #world_snapshot = world.wait_for_tick() 
         print(" created a car object ")
         world_msg_queue = Queue()
         quit  = Value(c_bool,False)
@@ -64,7 +89,8 @@ def main(args):
             #get ground truth value of vehicle to compare ES-EKF estimate and Ground truth Estimate
             gt_location = car.get_location()
             world_msg['gt_traj'] =  [gt_location.x,gt_location.y,gt_location.z]
-            
+            spectator_pos = get_spectator_pos(car.vehicle)
+            spectator.set_transform(spectator_pos)
             if not es_ekf.is_initialized():
                 # to initialize the the KF with current true state (only for first time)
                 es_ekf.initialize_with_true_state(gt_location)

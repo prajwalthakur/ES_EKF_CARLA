@@ -100,9 +100,6 @@ class Car:
         camera_bp.set_attribute('sensor_tick', str(1.0 / GNSS_FREQ))
         self.vehicle = world.spawn_actor(vehicle_bp, spawn_point)
         self.vehicle.set_autopilot(True)
-        self.spectator = world.get_spectator()
-        #world_snapshot = world.wait_for_tick() 
-        self.spectator.set_transform(self.vehicle.get_transform())
         self.camera = world.spawn_actor(
             blueprint=camera_bp,
             transform=carla.Transform(carla.Location(x=1.6, z=1.6)),
