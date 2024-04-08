@@ -40,9 +40,9 @@ def get_spectator_pos(vehicle):
     meter_distance = 10
     vehicle_transform = vehicle.get_transform()
     y,x = calculate_sides(meter_distance,vehicle_transform.rotation.yaw)
-    spectator_pos = carla.Transform(vehicle_transform.location + carla.Location(x=-x,y=-y,z=10)
+    spectator_pos = carla.Transform(vehicle_transform.location + carla.Location(x=-x,y=-y,z=20)
                                     , carla.Rotation(yaw= vehicle_transform.rotation.yaw,pitch=-25))
-    # loc = carla.Location(x=vehicle_transform.location.x,y=vehicle_transform.location.y,z=30)
+    # loc = carla.Location(x=vehicle_transform.location.x,y=vehicle_transform.location.y,z=15)
     # spectator_pos = carla.Transform(loc
     #                                 , carla.Rotation(yaw= 180.0,pitch=-90.0))
     return spectator_pos

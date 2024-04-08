@@ -15,6 +15,7 @@
 In this case sensor-data has been pre-recorded  and can now be traversed iteratively . 
 ### requirements
 - python3 
+- pip3 install -r requirements.txt
 ### steps to rrun
 - python3 main_recorded.py
 

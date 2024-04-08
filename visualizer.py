@@ -1,4 +1,3 @@
-# credit Shing-Yan Loo 
 # Visualize the sensor readings and vehicle trajectory
 
 import matplotlib

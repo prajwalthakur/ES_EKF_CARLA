@@ -1,12 +1,7 @@
 # Utitlity file with functions for handling rotations.
 #
-# Authors: Trevor Ablett and Jonathan Kelly
-# University of Toronto Institute for Aerospace Studies
-# Credit: taken from State Estimation and Localization for Self-Driving Cars by Coursera
-#   Please consider enrolling the course if you find this tutorial helpful and  
-#   would like to learn more about Kalman filter and state estimation for 
-#   self-driving cars in general.
-
+# Authors: Trevor Ablett
+# University of Toronto 
 import numpy as np
 
 def angle_normalize(a):
