@@ -29,6 +29,27 @@ from car import Car
 from visualizer import visualizer
 
 from util import destroy_queue
+import math
+def calculate_sides(hypotenuse,angle):
+    
+    
+    angle_radians = math.radians(angle)
+    opp_side = hypotenuse*math.sin(angle_radians)
+    adj_side = hypotenuse*math.cos(angle_radians)
+    return opp_side ,adj_side
+
+def get_spectator_pos(vehicle):
+    # subtract the delta x and y to be behind
+    meter_distance = 10
+    vehicle_transform = vehicle.get_transform()
+    y,x = calculate_sides(meter_distance,vehicle_transform.rotation.yaw)
+    spectator_pos = carla.Transform(vehicle_transform.location + carla.Location(x=-x,y=-y,z=10)
+                                    , carla.Rotation(yaw= vehicle_transform.rotation.yaw-90,pitch=-25))
+    # loc = carla.Location(x=vehicle_transform.location.x,y=vehicle_transform.location.y,z=30)
+    # spectator_pos = carla.Transform(loc
+    #                                 , carla.Rotation(yaw= 180.0,pitch=-90.0))
+    return spectator_pos
+
 
 def main():
     try:
@@ -41,7 +62,7 @@ def main():
         # Create a car object
         car = Car(world, client, spawn_point)
         print('created a car object')
-
+        spectator = world.get_spectator()
         # Visualizer
         visual_msg_queue = Queue()
         quit = Value(c_bool, False)
@@ -54,6 +75,9 @@ def main():
         visual_fps = 3
         last_ts = time.time()
 
+        spectator_pos = get_spectator_pos(car.vehicle)
+        spectator.set_transform(spectator_pos)
+        
         # Drive the car around and get sensor readings
         while True:
             world.tick()
