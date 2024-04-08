@@ -1,6 +1,6 @@
 # Error state Extended Kalman Filter for Sensor Fusion
 
-##Three ways to run the project
+## Two ways to run the project
 
 ## Steps to run the project with CARLA
 ##### Requirements
